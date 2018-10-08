@@ -29,7 +29,7 @@ ANDROID_NDK="~/android-ndk-r15c/"
 ANDROID_NATIVE_API_LEVEL="21"
 ANDROID_ABI="armeabi-v7a with NEON"
 
-MSVC_GENERATOR="Visual Studio 14 2015 Win64"
+MSVC_GENERATOR=""
 
 function show_help()
 {
@@ -49,6 +49,8 @@ Please select a build target:
 
   -p= | --profile=[Debug|Release], default: Release
 
+  --msvc_version=[2015|2017] # Set generator version in MSVC builds. (ex. 2015, 2017)
+
   --verbose_make             # Enables verbose make/build output.
   --android_toolchain        # Use Android NDK toolchain (may need adjustments to ANDROID_NDK,
                              # ANDROID_NATIVE_API_LEVEL, ANDROID_ABI script variables).
@@ -57,6 +59,27 @@ Please select a build target:
   --msvc_dynamic_runtime     # Enables dynamic runtime environment linking in MSVC builds.
 EOF
 exit
+}
+
+function try_set_msvc_generator()
+{
+  local VERSION=$1
+  local SUFFIX=""
+
+  case ${VERSION} in
+    2015) SUFFIX="14 2015";;
+    2017) SUFFIX="15 2017";;
+    *)
+      # non-supported MSVC version
+      echo "Non-supported MSVC version: ${VERSION}"
+      ;;
+  esac
+
+  if [ -n "${SUFFIX}" ]; then
+    MSVC_GENERATOR="Visual Studio ${SUFFIX} Win64" # Win64 can be optional later
+  else
+    MSVC_GENERATOR=""
+  fi
 }
 
 BUILD_TARGET=""
@@ -71,6 +94,14 @@ do
 
     -t=*|--target=*)
       BUILD_TARGET="${i#*=}"
+      shift # past argument=value
+      ;;
+    
+    --msvc_version=*)
+      try_set_msvc_generator ${i#*=}
+      if [ -z "${MSVC_GENERATOR}" ]; then
+        show_help # show help and return
+      fi
       shift # past argument=value
       ;;
 
@@ -134,6 +165,10 @@ case "$(uname -s)" in
     ;;
 
   CYGWIN*|MINGW*|MSYS*)
+    # Set MSVC_GENERATOR vs2015 as default
+    if [ -z "${MSVC_GENERATOR}" ]; then
+      MSVC_GENERATOR="Visual Studio 14 2015"
+    fi
     cmake -G"${MSVC_GENERATOR}"\
       -DBUILD_"${BUILD_TARGET}":BOOL=ON\
       "${CONFIG_FLAGS[@]}" "$@" ..
